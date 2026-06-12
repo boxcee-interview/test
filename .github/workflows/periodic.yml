@@ -45,11 +45,19 @@ jobs:
   e2e-tests-stable:
     runs-on: ubuntu-latest
     steps:
+      - name: Get Latest Crossplane Release
+        id: latest-release
+        run: |
+          LATEST=$(gh api repos/crossplane/crossplane/releases --jq '[.[] | select(.prerelease == false)][0].tag_name')
+          echo "LATEST_TAG=$LATEST" >> "$GITHUB_OUTPUT"
+          echo "LATEST_VERSION=${LATEST#v}" >> "$GITHUB_OUTPUT"
+          echo "LATEST_BRANCH=release-${LATEST#v}" >> "$GITHUB_OUTPUT"
+
       - name: Checkout Crossplane Repo
         uses: actions/checkout@v2
         with:
           repository: crossplane/crossplane
-          ref: release-1.12
+          ref: ${{ steps.latest-release.outputs.LATEST_BRANCH }}
       - name: Setup Go
         uses: actions/setup-go@v2
         with:
@@ -68,7 +76,7 @@ jobs:
         run: kubectl create namespace crossplane-system
         shell: bash
       - name: Install Crossplane from Stable
-        run: helm repo add crossplane-stable https://charts.crossplane.io/stable && helm repo update && helm install crossplane --namespace crossplane-system crossplane-stable/crossplane --version 1.12.2 --wait
+        run: helm repo add crossplane-stable https://charts.crossplane.io/stable && helm repo update && helm install crossplane --namespace crossplane-system crossplane-stable/crossplane --version ${{ steps.latest-release.outputs.LATEST_VERSION }} --wait
         shell: bash
       - name: Run E2E Tests
         run: go test -p 1 -timeout 10m -v --tags=e2e ./test/e2e/...
